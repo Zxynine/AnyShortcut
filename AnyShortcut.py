@@ -267,6 +267,40 @@ def repeat_command_handler(args: adsk.core.CommandCreatedEventArgs):
 	args.command.isExecutedWhenPreEmpted = False
 	executeCommand('RepeatCommand')
 
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def getCameraDirection(camera:adsk.core.Camera):
+	eye = camera.eye
+	target = camera.target
+	return eye.vectorTo(target)
+
+def getLineDirection(line):
+	if isinstance(line, adsk.fusion.BRepEdge):
+		start = line.startVertex.geometry
+		end = line.endVertex.geometry
+		lineDirection = start.vectorTo(end)
+	elif isinstance(line, adsk.fusion.SketchLine):
+		start = line.startSketchPoint.geometry
+		end = line.endSketchPoint.geometry
+		lineDirection = start.vectorTo(end)
+	elif isinstance(line, adsk.fusion.ConstructionAxis):
+		infLine = line.geometry
+		lineDirection = infLine.direction
+	return lineDirection
+
+def projectVectors(fromVec:adsk.core.Vector3D,toVec:adsk.core.Vector3D):
+	dotProd = fromVec.dotProduct(toVec)
+	sqrMag = fromVec.length**2
+
+	projection = toVec.copy()
+	projection.scaleBy(dotProd/sqrMag)
+	return projection
+
+
+
 def alignViewHandler(args: adsk.core.CommandCreatedEventArgs):
 	# Avoid getting picked up and repeated into eternity
 	args.command.isRepeatable = False
@@ -275,24 +309,37 @@ def alignViewHandler(args: adsk.core.CommandCreatedEventArgs):
 	adsk.doEvents()
 
 	upLine = ui_.selectEntity('Please select a line represinting the "up" direction', 'LinearEdges,SketchLines,ConstructionLines').entity
-	if isinstance(upLine, adsk.fusion.BRepEdge):
-		start = upLine.startVertex.geometry
-		end = upLine.endVertex.geometry
-		lineDirection = start.vectorTo(end)
-	elif isinstance(upLine, adsk.fusion.SketchLine):
-		start = upLine.startSketchPoint.geometry
-		end = upLine.endSketchPoint.geometry
-		lineDirection = start.vectorTo(end)
-	elif isinstance(upLine, adsk.fusion.ConstructionAxis):
-		infLine = upLine.geometry
-		lineDirection = infLine.direction
 
 	camera_copy = app_.activeViewport.camera
-	camera_copy.upVector = lineDirection
+	camera_copy.upVector = getLineDirection(upLine)
 	camera_copy.isSmoothTransition = True
 	app_.activeViewport.camera = camera_copy
 	adsk.doEvents()
 	ui_.activeSelections.clear()
+
+
+def changeViewAxis(args: adsk.core.CommandCreatedEventArgs):
+	args.command.isRepeatable = False
+	args.command.isExecutedWhenPreEmpted = False
+	upLine = ui_.selectEntity('Please select a line represinting the "forwards" direction', 'LinearEdges,SketchLines,ConstructionLines').entity
+	lineDirection = getLineDirection(upLine)
+	cameraDirection = getCameraDirection(app_.activeViewport.camera)
+
+	projection = projectVectors(cameraDirection,lineDirection)
+
+	orintatedVector = projection.copy()
+	orintatedVector.normalize()
+	orintatedVector.scaleBy(cameraDirection.length)
+
+	target = app_.activeViewport.camera.target
+	newEye = target.asVector()
+	newEye.subtract(orintatedVector)
+
+	camera_copy = app_.activeViewport.camera
+	camera_copy.eye = newEye.asPoint()
+	camera_copy.target = target
+	camera_copy.isSmoothTransition = True
+	app_.activeViewport.camera = camera_copy
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -302,7 +349,7 @@ def create_roll_history_handler(move_function_name):
 
 	def execute_handler(args: adsk.core.CommandEventArgs):
 		timeline_status, timeline = libTimeLine.get_timeline()
-		if timeline_status != timeline.TIMELINE_STATUS_OK:
+		if timeline_status != libTimeLine.TIMELINE_STATUS_OK:
 			args.executeFailed = True
 			args.executeFailedMessage = 'Failed to get the timeline'
 			return
@@ -330,17 +377,13 @@ def create_view_orientation_handler(view_orientation_name, smooth=False, fitView
 def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 	global builtin_dropdown_
 	ifDelete(parent.controls.itemById(BUILTIN_DROPDOWN_ID))
-	builtin_dropdown_ = parent.controls.addDropDown(f'Built-in Commands',
-													'./resources/builtin',
-													BUILTIN_DROPDOWN_ID)
+	builtin_dropdown_ = parent.controls.addDropDown(f'Built-in Commands', './resources/builtin', BUILTIN_DROPDOWN_ID)
 
 	def create(controls:adsk.core.ToolbarControls, cmd_def_id, text, tooltip, resource_folder, handler):
-		# The cmd_def_id must never change during development of the add-in
-		# as users hotkeys will map to the command definition ID.
+		# The cmd_def_id must never change during development of the add-in as users hotkeys will map to the command definition ID.
 		ifDelete(ui_.commandDefinitions.itemById(cmd_def_id))
 		cmd_def = ui_.commandDefinitions.addButtonDefinition( cmd_def_id, text, tooltip, resource_folder)
 		checkIcon(cmd_def) # Must have icon for the assign shortcut menu to appear
-
 		events_manager_.add_handler(cmd_def.commandCreated, callback=handler)
 		return controls.addCommand(cmd_def)
 
@@ -386,9 +429,22 @@ def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 			'./resources/repeat',
 			alignViewHandler)
 
+	create(builtin_dropdown_.controls,
+			'thomasa88_anyShortcutBuiltinChangeView',
+			'Change the view axis',
+			'',
+			'./resources/activate',
+			changeViewAxis)
+
+	create(builtin_dropdown_.controls,
+			'thomasa88_anyShortcutBuiltinRotateCam',
+			'Change the view axis',
+			'',
+			'./resources/repeat',
+			createRotateCamera())
+
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	timeline_dropdown:adsk.core.DropDownControl = builtin_dropdown_.controls.addDropDown('Timeline', './resources/timeline',
-															   'thomasa88_anyShortcutBuiltinTimelineList')
+	timeline_dropdown:adsk.core.DropDownControl = builtin_dropdown_.controls.addDropDown('Timeline', './resources/timeline', 'thomasa88_anyShortcutBuiltinTimelineList')
 
 	create(timeline_dropdown.controls,
 			'thomasa88_anyShortcutListRollToBeginning',
@@ -418,13 +474,12 @@ def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 			'./resources/timelineend',
 			create_roll_history_handler('moveToEnd'))
 
-	# timeline.play() just seems to skip to the end. Disabled.
-	# create(timeline_dropdown.controls,
-		# 'thomasa88_anyShortcutListHistoryPlay',
-	#     'Play History from Current Position',
-	#     '',
-	#     './resources/timelineplay',
-	#     create_roll_history_handler('play'))
+	create(timeline_dropdown.controls,
+			'thomasa88_anyShortcutListHistoryPlay',
+			'Play History from Current Position',
+			'',
+			'./resources/timelineplay',
+			create_roll_history_handler('play'))
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	view_dropdown:adsk.core.DropDownControl = builtin_dropdown_.controls.addDropDown('View Orientation', './resources/viewfront', 'thomasa88_anyShortcutBuiltinViewList')
