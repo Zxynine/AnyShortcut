@@ -161,7 +161,7 @@ def look_at_sketch_handler(args: adsk.core.CommandCreatedEventArgs):
 	# Avoid getting listed as a repeatable command.
 	args.command.isRepeatable = False
 	edit_object = app_.activeEditObject
-	if edit_object.classType() == 'adsk::fusion::Sketch':
+	if isinstance(edit_object, adsk.fusion.Sketch):
 		# laughingcreek provided the way that Fusion actually does this "Look At"
 		# https://forums.autodesk.com/t5/fusion-360-design-validate/shortcut-for-look-at/m-p/9517669/highlight/true#M217044
 		ui_.activeSelections.clear()
@@ -177,8 +177,7 @@ def look_at_sketch_or_selected_handler(args: adsk.core.CommandCreatedEventArgs):
 	# Avoid getting listed as a repeatable command.
 	args.command.isRepeatable = False
 	if ui_.activeSelections.count == 0:
-		edit_object = app_.activeEditObject
-		if isinstance(edit_object, adsk.fusion.Sketch): look_at_sketch_handler(args)
+		look_at_sketch_handler(args)
 	else: executeCommand('LookAtCommand')
 
 def activate_containing_component_handler(args: adsk.core.CommandCreatedEventArgs):
