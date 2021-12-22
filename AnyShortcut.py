@@ -399,7 +399,6 @@ def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 @error.CatchErrors
 def run(context):
 	global app_, ui_
-	global tracking_dropdown_
 	global panel_
 	app_,ui_ = utils.AppObjects()
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -408,9 +407,9 @@ def run(context):
 
 	ifDelete(panels.itemById(PANEL_ID))
 	panel_ = panels.add(PANEL_ID, f'{NAME}')
-
 	add_builtin_dropdown(panel_)
-
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	global tracking_dropdown_
 	ifDelete(panel_.controls.itemById(TRACKING_DROPDOWN_ID))
 	tracking_dropdown_ = panel_.controls.addDropDown(f'Command Recorder',
 														'./resources/tracker',
@@ -431,11 +430,6 @@ def run(context):
 	enable_control.isPromoted = True
 	enable_control.isPromotedByDefault = True
 	tracking_dropdown_.controls.addSeparator()
-
-
-
-
-
 
 
 
