@@ -334,7 +334,7 @@ def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 													'./resources/builtin',
 													BUILTIN_DROPDOWN_ID)
 
-	def create(cmd_def_id, text, tooltip, resource_folder, handler):
+	def create(controls:adsk.core.ToolbarControls, cmd_def_id, text, tooltip, resource_folder, handler):
 		# The cmd_def_id must never change during development of the add-in
 		# as users hotkeys will map to the command definition ID.
 		ifDelete(ui_.commandDefinitions.itemById(cmd_def_id))
@@ -342,104 +342,104 @@ def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 		checkIcon(cmd_def) # Must have icon for the assign shortcut menu to appear
 
 		events_manager_.add_handler(cmd_def.commandCreated, callback=handler)
-		return cmd_def
+		return controls.addCommand(cmd_def)
 
-	c = create('thomasa88_anyShortcutListLookAtSketchCommand',
-				'Look At Sketch',
-				'Rotates the view to look at the sketch currently being edited. ' + 
-				'No action is performed if a sketch is not being edited.',
-				'./resources/lookatsketch',
-				look_at_sketch_handler)
-	builtin_dropdown_.controls.addCommand(c)
+	create(builtin_dropdown_.controls,
+			'thomasa88_anyShortcutListLookAtSketchCommand',
+			'Look At Sketch',
+			'Rotates the view to look at the sketch currently being edited. ' + 
+			'No action is performed if a sketch is not being edited.',
+			'./resources/lookatsketch',
+			look_at_sketch_handler)
 
-	c = create('thomasa88_anyShortcutListLookAtSketchOrSelectedCommand',
-				'Look At Selected or Sketch',
-				'Rotates the view to look at, in priority order:\n' +
-				' 1. The selected object, if any\n' +
-				' 2. The sketch being edited',
-				'./resources/lookatselectedorsketch',
-				look_at_sketch_or_selected_handler)
-	builtin_dropdown_.controls.addCommand(c)
+	create(builtin_dropdown_.controls,
+			'thomasa88_anyShortcutListLookAtSketchOrSelectedCommand',
+			'Look At Selected or Sketch',
+			'Rotates the view to look at, in priority order:\n' +
+			' 1. The selected object, if any\n' +
+			' 2. The sketch being edited',
+			'./resources/lookatselectedorsketch',
+			look_at_sketch_or_selected_handler)
 
-	c = create('thomasa88_anyShortcutListActivateContainingOrComponentCommand',
-				'Activate (containing) Component',
-				'Activates the selected component. If no component is selected, '
-				+ 'the component directly containing the selected object is activated.',
-				'./resources/activate',
-				activate_containing_component_handler)
-	builtin_dropdown_.controls.addCommand(c)
+	create(builtin_dropdown_.controls,
+			'thomasa88_anyShortcutListActivateContainingOrComponentCommand',
+			'Activate (containing) Component',
+			'Activates the selected component. If no component is selected, '
+			+ 'the component directly containing the selected object is activated.',
+			'./resources/activate',
+			activate_containing_component_handler)
 
 	# For some reason, repeat captured using the tracking only works when clicking,
 	# not with a keyboard shortcut.
-	c = create('thomasa88_anyShortcutBuiltinRepeatCommand',
-				'Repeat Last Command',
-				'',
-				'./resources/repeat',
-				repeat_command_handler)
-	builtin_dropdown_.controls.addCommand(c)
+	create(builtin_dropdown_.controls,
+			'thomasa88_anyShortcutBuiltinRepeatCommand',
+			'Repeat Last Command',
+			'',
+			'./resources/repeat',
+			repeat_command_handler)
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	c = create('thomasa88_anyShortcutBuiltinAlignView',
-				'Align The Camera',
-				'',
-				'./resources/repeat',
-				alignViewHandler)
-	builtin_dropdown_.controls.addCommand(c)
+	create(builtin_dropdown_.controls,
+			'thomasa88_anyShortcutBuiltinAlignView',
+			'Align The Camera',
+			'',
+			'./resources/repeat',
+			alignViewHandler)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	timeline_dropdown:adsk.core.DropDownControl = builtin_dropdown_.controls.addDropDown('Timeline', './resources/timeline',
 															   'thomasa88_anyShortcutBuiltinTimelineList')
 
-	c = create('thomasa88_anyShortcutListRollToBeginning',
-				'Roll History Marker to Beginning',
-				'',
-				'./resources/timelinebeginning',
-				create_roll_history_handler('moveToBeginning'))
-	timeline_dropdown.controls.addCommand(c)
+	create(timeline_dropdown.controls,
+			'thomasa88_anyShortcutListRollToBeginning',
+			'Roll History Marker to Beginning',
+			'',
+			'./resources/timelinebeginning',
+			create_roll_history_handler('moveToBeginning'))
 
-	c = create('thomasa88_anyShortcutListRollBack',
-				'Roll History Marker Back',
-				'',
-				'./resources/timelineback',
-				create_roll_history_handler('moveToPreviousStep'))
-	timeline_dropdown.controls.addCommand(c)
+	create(timeline_dropdown.controls,
+			'thomasa88_anyShortcutListRollBack',
+			'Roll History Marker Back',
+			'',
+			'./resources/timelineback',
+			create_roll_history_handler('moveToPreviousStep'))
 	
-	c = create('thomasa88_anyShortcutListRollForward',
-				'Roll History Marker Forward',
-				'',
-				'./resources/timelineforward',
-				create_roll_history_handler('movetoNextStep'))
-	timeline_dropdown.controls.addCommand(c)
+	create(timeline_dropdown.controls,
+			'thomasa88_anyShortcutListRollForward',
+			'Roll History Marker Forward',
+			'',
+			'./resources/timelineforward',
+			create_roll_history_handler('movetoNextStep'))
 
-	c = create('thomasa88_anyShortcutListRollToEnd',
-			   'Roll History Marker to End',
-			   '',
-			   './resources/timelineend',
-			   create_roll_history_handler('moveToEnd'))
-	timeline_dropdown.controls.addCommand(c)
+	create(timeline_dropdown.controls,
+			'thomasa88_anyShortcutListRollToEnd',
+			'Roll History Marker to End',
+			'',
+			'./resources/timelineend',
+			create_roll_history_handler('moveToEnd'))
 
 	# timeline.play() just seems to skip to the end. Disabled.
-	# c = create('thomasa88_anyShortcutListHistoryPlay',
+	# create(timeline_dropdown.controls,
+		# 'thomasa88_anyShortcutListHistoryPlay',
 	#     'Play History from Current Position',
 	#     '',
 	#     './resources/timelineplay',
 	#     create_roll_history_handler('play'))
-	# timeline_dropdown.controls.addCommand(c)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	view_dropdown:adsk.core.DropDownControl = builtin_dropdown_.controls.addDropDown('View Orientation', './resources/viewfront', 'thomasa88_anyShortcutBuiltinViewList')
 	for view in ['Front', 'Back', 'Top', 'Bottom', 'Left', 'Right']:
-		c = create('thomasa88_anyShortcutBuiltinView' + view,
+		create(view_dropdown.controls,
+			'thomasa88_anyShortcutBuiltinView' + view,
 			'View ' + view, '',
 			'./resources/view' + view.lower(),
 			create_view_orientation_handler(view))
-		view_dropdown.controls.addCommand(c)
 		
 	view_corner_dropdown:adsk.core.DropDownControl = builtin_dropdown_.controls.addDropDown('View Corner', './resources/viewisotopright', 'thomasa88_anyShortcutBuiltinCornerViewList')
 	for view in ['IsoTopRight', 'IsoTopLeft','IsoBottomRight', 'IsoBottomLeft' ]:
-		c = create('thomasa88_anyShortcutBuiltinCornerViewList' + view,
+		create(view_corner_dropdown.controls,
+			'thomasa88_anyShortcutBuiltinCornerViewList' + view,
 			'View ' + view.strip('Iso'), '',
 			'./resources/view' + view.lower(),
 			create_view_orientation_handler(view))
-		view_corner_dropdown.controls.addCommand(c)
 
