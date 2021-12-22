@@ -178,14 +178,14 @@ def look_at_sketch_or_selected_handler(args: adsk.core.CommandCreatedEventArgs):
 	args.command.isRepeatable = False
 	if ui_.activeSelections.count == 0:
 		edit_object = app_.activeEditObject
-		if edit_object.classType() == 'adsk::fusion::Sketch': look_at_sketch_handler(args)
+		if isinstance(edit_object, adsk.fusion.Sketch): look_at_sketch_handler(args)
 	else: executeCommand('LookAtCommand')
 
 def activate_containing_component_handler(args: adsk.core.CommandCreatedEventArgs):
 	args.command.isRepeatable = False
 	if ui_.activeSelections.count == 1:
 		selected = ui_.activeSelections[0].entity
-		if selected.classType() not in ['adsk::fusion::Component', 'adsk::fusion::Occurrence']:
+		if not isinstance(selected, (adsk.fusion.Component, adsk.fusion.Occurrence)):
 			ui_.activeSelections.clear() # Component not selected. Select the component.
 			if selected.assemblyContext is None:
 				ui_.activeSelections.add(app_.activeProduct.rootComponent) # Root component
