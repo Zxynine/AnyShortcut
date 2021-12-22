@@ -35,7 +35,7 @@ FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 # Import relative path to avoid namespace pollution
 from .thomasa88lib import utils, events, manifest, error, timeline as libTimeLine
 utils.ReImport_List(events, manifest, error, libTimeLine, utils)
-
+# def newID(idVal): return 
 
 
 ENABLE_CMD_DEF_ID = 'thomasa88_anyShortcutList'
@@ -330,6 +330,7 @@ def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 				repeat_command_handler)
 	builtin_dropdown_.controls.addCommand(c)
 	
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	c = create('thomasa88_anyShortcutBuiltinAlignView',
 				'Align The Camera',
 				'',
@@ -337,6 +338,7 @@ def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 				alignViewHandler)
 	builtin_dropdown_.controls.addCommand(c)
 
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	timeline_dropdown:adsk.core.DropDownControl = builtin_dropdown_.controls.addDropDown('Timeline', './resources/timeline',
 															   'thomasa88_anyShortcutBuiltinTimelineList')
 
@@ -376,6 +378,7 @@ def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 	#     create_roll_history_handler('play'))
 	# timeline_dropdown.controls.addCommand(c)
 
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	view_dropdown:adsk.core.DropDownControl = builtin_dropdown_.controls.addDropDown('View Orientation', './resources/viewfront', 'thomasa88_anyShortcutBuiltinViewList')
 	for view in ['Front', 'Back', 'Top', 'Bottom', 'Left', 'Right']:
 		c = create('thomasa88_anyShortcutBuiltinView' + view,
