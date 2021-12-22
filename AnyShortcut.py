@@ -299,22 +299,24 @@ def projectVectors(fromVec:adsk.core.Vector3D,toVec:adsk.core.Vector3D):
 	projection.scaleBy(dotProd/sqrMag)
 	return projection
 
+	# executeCommand('LookAtCommand')
+	# adsk.doEvents()
 
 
 def alignViewHandler(args: adsk.core.CommandCreatedEventArgs):
-	# Avoid getting picked up and repeated into eternity
 	args.command.isRepeatable = False
 	args.command.isExecutedWhenPreEmpted = False
-	executeCommand('LookAtCommand')
-	adsk.doEvents()
-
 	upLine = ui_.selectEntity('Please select a line represinting the "up" direction', 'LinearEdges,SketchLines,ConstructionLines').entity
+	lineDirection = getLineDirection(upLine)
+	upDirection = app_.activeViewport.camera.upVector.copy()
+
+	orintatedVector = projectVectors(upDirection,lineDirection)
+	orintatedVector.normalize()
 
 	camera_copy = app_.activeViewport.camera
-	camera_copy.upVector = getLineDirection(upLine)
+	camera_copy.upVector = orintatedVector
 	camera_copy.isSmoothTransition = True
 	app_.activeViewport.camera = camera_copy
-	adsk.doEvents()
 	ui_.activeSelections.clear()
 
 
@@ -325,21 +327,128 @@ def changeViewAxis(args: adsk.core.CommandCreatedEventArgs):
 	lineDirection = getLineDirection(upLine)
 	cameraDirection = getCameraDirection(app_.activeViewport.camera)
 
-	projection = projectVectors(cameraDirection,lineDirection)
-
-	orintatedVector = projection.copy()
+	orintatedVector = projectVectors(cameraDirection,lineDirection)
 	orintatedVector.normalize()
 	orintatedVector.scaleBy(cameraDirection.length)
 
-	target = app_.activeViewport.camera.target
-	newEye = target.asVector()
+	newEye = app_.activeViewport.camera.target.asVector()
 	newEye.subtract(orintatedVector)
 
 	camera_copy = app_.activeViewport.camera
 	camera_copy.eye = newEye.asPoint()
-	camera_copy.target = target
 	camera_copy.isSmoothTransition = True
 	app_.activeViewport.camera = camera_copy
+	ui_.activeSelections.clear()
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def createInputsHandler():
+	def create_handler(args: adsk.core.CommandCreatedEventArgs):
+		Inputs = args.command.commandInputs
+
+
+		def createTab(toolbarTab:adsk.core.ToolbarTab):
+			tabId = 'Tion_MacroCommand_Tabs_' + toolbarTab.id
+			tabName = toolbarTab.name
+			return Inputs.addTabCommandInput(tabId,tabName, '')
+
+		def createEntry(tableInput:adsk.core.TableCommandInput, row, control:adsk.core.CommandControl):
+			cmdDef = control.commandDefinition
+			checkIcon(cmdDef)
+
+			# controlButton = tableInput.commandInputs.addTextBoxCommandInput('Tion_MacroCommand_Control_'+control.id+'_Empty','', '',1,True)
+			# tableInput.addCommandInput(controlButton,row,0)
+
+			controlButton = tableInput.commandInputs.addBoolValueInput('Tion_MacroCommand_Control_'+control.id,cmdDef.name, False, cmdDef.resourceFolder,False)
+			controlButton.text = cmdDef.name
+			controlButton.isFullWidth=True
+			return tableInput.addCommandInput(controlButton,row,0,columnSpan=1)
+
+		def createPanel(tableInput:adsk.core.TableCommandInput, toolbarPanel:adsk.core.ToolbarPanel):
+			try:
+				index = tableInput.rowCount
+				DropdownArrow = tableInput.commandInputs.addBoolValueInput('Tion_MacroCommand_Panel_'+toolbarPanel.id+'_Expanded','',True,'',False)
+				tableInput.addCommandInput(DropdownArrow,index,0)
+				PanelButton = tableInput.commandInputs.addBoolValueInput('Tion_MacroCommand_Panel_'+toolbarPanel.id,toolbarPanel.name,False,'',False)
+				tableInput.addCommandInput(PanelButton,index,1)
+				PanelID = tableInput.commandInputs.addTextBoxCommandInput('Tion_MacroCommand_Panel_'+toolbarPanel.id+'_ID', '', toolbarPanel.id,1,True)
+				PanelID.isFullWidth=True
+				tableInput.addCommandInput(PanelID,index,2)
+
+				try:
+					for i in range(len(toolbarPanel.controls)):
+						try:
+							control = toolbarPanel.controls.item(i)
+							if not isinstance(control, adsk.core.CommandControl):continue
+							if not control.isValid or not control.isVisible:continue
+							createEntry(tableInput,tableInput.rowCount,control)
+						except:pass
+				except:pass
+			except:pass
+		
+
+		print = ui_.messageBox
+
+		workspaces = ui_.workspacesByProductType(app_.activeProduct.productType)
+		toolbarTabs = ui_.activeWorkspace.toolbarTabs
+		currentToolbarTab:adsk.core.ToolbarTab = None
+		currentTabInput:adsk.core.TabCommandInput = None
+		for toolbarTab in toolbarTabs:
+			if not toolbarTab or not toolbarTab.isValid or not toolbarTab.isVisible:continue
+			tabInput:adsk.core.TabCommandInput = createTab(toolbarTab)
+			if currentToolbarTab is None and toolbarTab.isActive:
+				currentToolbarTab = toolbarTab
+				currentTabInput = tabInput
+				
+		toolbarPanels = currentToolbarTab.toolbarPanels
+		panelRow = Inputs.addTableCommandInput('Tion_MacroCommand_Panels', '', 0,'1:5:5')
+		panelRow.maximumVisibleRows=30
+		panelRow.isFullWidth = True
+
+
+		for panel in toolbarPanels: createPanel(panelRow,panel)
+
+
+	return create_handler
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def createChain(*commandIds):
+	startingInfo = None
+	terminatedInfo = None
+
+	chainId = None
+	commandOrder = []
+	currentCommand = None
+	def initialCreate(args: adsk.core.CommandCreatedEventArgs):
+		nonlocal startingInfo, terminatedInfo,chainId,commandOrder
+		commandOrder = list(commandIds)
+		chainId = args.command.parentCommandDefinition.id
+		startingInfo = events_manager_.add_handler(ui_.commandStarting, callback=commandStartingHandler)
+		terminatedInfo = events_manager_.add_handler(ui_.commandTerminated, callback=commandTerminatedHandler)
+		executeCommand(commandOrder[0])
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	def commandStartingHandler(args:adsk.core.ApplicationCommandEventArgs):
+		nonlocal currentCommand
+		startingCommand = args.commandId
+		if startingCommand == chainId:return
+		if startingCommand != commandOrder[0]: return
+		currentCommand = commandOrder.pop(0)
+
+	def commandTerminatedHandler(args:adsk.core.ApplicationCommandEventArgs):
+		if currentCommand is None: return
+		if len(commandOrder) == 0: return removeQueue()
+		if args.commandId != currentCommand: return
+		executeCommand(commandOrder[0])
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	def removeQueue():
+		nonlocal currentCommand,startingInfo,terminatedInfo
+		events_manager_.remove_handler(startingInfo)
+		events_manager_.remove_handler(terminatedInfo)
+		startingInfo=terminatedInfo= None
+		currentCommand = None
+	return initialCreate
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -437,12 +546,19 @@ def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 			changeViewAxis)
 
 	create(builtin_dropdown_.controls,
-			'thomasa88_anyShortcutBuiltinRotateCam',
-			'Change the view axis',
+			'thomasa88_anyShortcutBuiltinChangeAlignView',
+			'Change and align the view axis',
 			'',
-			'./resources/repeat',
-			createRotateCamera())
+			'./resources/timelineforward',
+			createChain('thomasa88_anyShortcutBuiltinChangeView', 'thomasa88_anyShortcutBuiltinAlignView'))
 
+	create(builtin_dropdown_.controls,
+			'tion_buttonTest',
+			'CommandChaining',
+			'',
+			'./resources/activate',
+			createInputsHandler())
+	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	timeline_dropdown:adsk.core.DropDownControl = builtin_dropdown_.controls.addDropDown('Timeline', './resources/timeline', 'thomasa88_anyShortcutBuiltinTimelineList')
 
