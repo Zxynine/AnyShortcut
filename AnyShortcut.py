@@ -394,9 +394,7 @@ def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 			'./resources/view' + view.lower(),
 			create_view_orientation_handler(view))
 		view_corner_dropdown.controls.addCommand(c)
-	# adsk.core.ViewOrientations.IsoTopRightViewOrientation
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-otherCreations = []
 
 @error.CatchErrors
 def run(context):
@@ -444,7 +442,7 @@ def run(context):
 @error.CatchErrors
 def stop(context):
 	events_manager_.clean_up()
-	deleteAll(tracking_dropdown_, builtin_dropdown_, panel_, *otherCreations)
+	deleteAll(tracking_dropdown_, builtin_dropdown_, panel_)
 	# Need to delete children?
 
 
