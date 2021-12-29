@@ -363,18 +363,13 @@ def createInputsHandler():
 			controlButton = tableInput.commandInputs.addBoolValueInput('Tion_MacroCommand_Control_'+control.id,cmdDef.name, False, cmdDef.resourceFolder,False)
 			controlButton.text = cmdDef.name
 			controlButton.isFullWidth=True
-			return tableInput.addCommandInput(controlButton,row,0,columnSpan=1)
+			return tableInput.addCommandInput(controlButton,row,0,columnSpan=0)
 
 		def createPanel(tableInput:adsk.core.TableCommandInput, toolbarPanel:adsk.core.ToolbarPanel):
 			try:
 				index = tableInput.rowCount
-				DropdownArrow = tableInput.commandInputs.addBoolValueInput('Tion_MacroCommand_Panel_'+toolbarPanel.id+'_Expanded','',True,'',False)
-				tableInput.addCommandInput(DropdownArrow,index,0)
 				PanelButton = tableInput.commandInputs.addBoolValueInput('Tion_MacroCommand_Panel_'+toolbarPanel.id,toolbarPanel.name,False,'',False)
-				tableInput.addCommandInput(PanelButton,index,1)
-				PanelID = tableInput.commandInputs.addTextBoxCommandInput('Tion_MacroCommand_Panel_'+toolbarPanel.id+'_ID', '', toolbarPanel.id,1,True)
-				PanelID.isFullWidth=True
-				tableInput.addCommandInput(PanelID,index,2)
+				tableInput.addCommandInput(PanelButton,index,0)
 
 				try:
 					for i in range(len(toolbarPanel.controls)):
@@ -402,7 +397,7 @@ def createInputsHandler():
 				currentTabInput = tabInput
 				
 		toolbarPanels = currentToolbarTab.toolbarPanels
-		panelRow = Inputs.addTableCommandInput('Tion_MacroCommand_Panels', '', 0,'1:5:5')
+		panelRow = Inputs.addTableCommandInput('Tion_MacroCommand_Panels', '', 0,'1:1')
 		panelRow.maximumVisibleRows=30
 		panelRow.isFullWidth = True
 
@@ -614,3 +609,146 @@ def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 			'./resources/view' + view.lower(),
 			create_view_orientation_handler(view))
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	# add_builtin_dropdown(panel_)
+
+
+
+# def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
+# 	global builtin_dropdown_
+# 	ifDelete(parent.controls.itemById(BUILTIN_DROPDOWN_ID))
+# 	builtin_dropdown_ = parent.controls.addDropDown(f'Built-in Commands', './resources/builtin', BUILTIN_DROPDOWN_ID)
+
+# 	def create(controls:adsk.core.ToolbarControls, cmd_def_id, text, tooltip, resource_folder, handler):
+# 		# The cmd_def_id must never change during development of the add-in as users hotkeys will map to the command definition ID.
+# 		ifDelete(ui_.commandDefinitions.itemById(cmd_def_id))
+# 		cmd_def = ui_.commandDefinitions.addButtonDefinition( cmd_def_id, text, tooltip, resource_folder)
+# 		checkIcon(cmd_def) # Must have icon for the assign shortcut menu to appear
+# 		events_manager_.add_handler(cmd_def.commandCreated, callback=handler)
+# 		return controls.addCommand(cmd_def)
+
+# 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 	create(builtin_dropdown_.controls,
+# 			'zxynine_anyMacroBuiltinAlignView',
+# 			'Align The Camera',
+# 			'',
+# 			'./resources/repeat',
+# 			alignViewHandler)
+
+# 	create(builtin_dropdown_.controls,
+# 			'zxynine_anyMacroBuiltinChangeView',
+# 			'Change the view axis',
+# 			'',
+# 			'./resources/activate',
+# 			changeViewAxis)
+
+# 	create(builtin_dropdown_.controls,
+# 			'zxynine_anyMacroBuiltinChangeAlignView',
+# 			'Change and align the view axis',
+# 			'',
+# 			'./resources/timelineforward',
+# 			createChain('zxynine_anyMacroBuiltinChangeView', 'zxynine_anyMacroBuiltinAlignView'))
+
+# 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# def getCameraDirection(camera:adsk.core.Camera):
+# 	eye = camera.eye
+# 	target = camera.target
+# 	return eye.vectorTo(target)
+
+# def getLineDirection(line):
+# 	if isinstance(line, adsk.fusion.BRepEdge):
+# 		start = line.startVertex.geometry
+# 		end = line.endVertex.geometry
+# 		lineDirection = start.vectorTo(end)
+# 	elif isinstance(line, adsk.fusion.SketchLine):
+# 		start = line.startSketchPoint.geometry
+# 		end = line.endSketchPoint.geometry
+# 		lineDirection = start.vectorTo(end)
+# 	elif isinstance(line, adsk.fusion.ConstructionAxis):
+# 		infLine = line.geometry
+# 		lineDirection = infLine.direction
+# 	return lineDirection
+
+# def projectVectors(fromVec:adsk.core.Vector3D,toVec:adsk.core.Vector3D,Normalised=False):
+# 	dotProd = fromVec.dotProduct(toVec)
+# 	sqrMag = fromVec.length**2
+
+# 	projection = toVec.copy()
+# 	projection.scaleBy(dotProd/sqrMag)
+# 	if Normalised: projection.normalize()
+# 	return projection
+
+
+
+	
+
+# def alignViewHandler(args: adsk.core.CommandCreatedEventArgs):
+# 	args.command.isRepeatable = False
+# 	args.command.isExecutedWhenPreEmpted = False
+# 	upLine = ui_.selectEntity('Please select a line represinting the "up" direction', 'LinearEdges,SketchLines,ConstructionLines').entity
+# 	lineDirection = getLineDirection(upLine)
+# 	upDirection = app_.activeViewport.camera.upVector.copy()
+
+# 	orintatedVector = projectVectors(upDirection,lineDirection,True)
+# 	camera_copy = app_.activeViewport.camera
+# 	camera_copy.upVector = orintatedVector
+# 	camera_copy.isSmoothTransition = True
+# 	app_.activeViewport.camera = camera_copy
+# 	ui_.activeSelections.clear()
+
+
+# def changeViewAxis(args: adsk.core.CommandCreatedEventArgs):
+# 	args.command.isRepeatable = False
+# 	args.command.isExecutedWhenPreEmpted = False
+# 	upLine = ui_.selectEntity('Please select a line represinting the "forwards" direction', 'LinearEdges,SketchLines,ConstructionLines').entity
+# 	lineDirection = getLineDirection(upLine)
+# 	cameraDirection = getCameraDirection(app_.activeViewport.camera)
+
+# 	orintatedVector = projectVectors(cameraDirection,lineDirection,True)
+# 	orintatedVector.scaleBy(cameraDirection.length)
+
+# 	newEye = app_.activeViewport.camera.target.asVector()
+# 	newEye.subtract(orintatedVector)
+
+# 	camera_copy = app_.activeViewport.camera
+# 	camera_copy.eye = newEye.asPoint()
+# 	camera_copy.isSmoothTransition = True
+# 	app_.activeViewport.camera = camera_copy
+# 	ui_.activeSelections.clear()
+
+
+# #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+		# if cmdDef not in self.cmdDefs:
+		# 	checkIcon(cmdDef)
+		# 	newID = f'AutoMacro_Remove_{cmdDef.id}' 
+
+		# 	newCmdDef,newCmdCtrl = NewCmdDefCtrl(tracking_dropdown_.controls, newID, cmdDef.name, cmdDef.resourceFolder, 'Click to remove this command')
+		# 	# ifDelete(ui_.commandDefinitions.itemById(newID))
+		# 	# newCmdDef = ui_.commandDefinitions.addButtonDefinition(newID,cmdDef.name,'Click to remove this command',cmdDef.resourceFolder)
+		# 	# newCmdCtrl = tracking_dropdown_.controls.addCommand(newCmdDef)
+		# 	def removeCommand(args: adsk.core.CommandCreatedEventArgs):
+		# 		self.cmdDefs.remove(newCmdDef)
+		# 		self.cmdCtrls.remove(newCmdCtrl)
+		# 		deleteAll(newCmdDef,newCmdCtrl)
+		# 	events_manager_.add_handler(newCmdDef.commandCreated,callback=removeCommand)
