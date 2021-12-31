@@ -126,8 +126,7 @@ def enable_cmd_def__created_handler(args: adsk.core.CommandCreatedEventArgs):
 	events_manager_.add_handler(args.command.execute, callback=enable_command_execute_handler)
 
 def enable_command_execute_handler(args):
-	if not tracking_: start_tracking()
-	else: stop_tracking()
+	start_tracking() if not tracking_ else stop_tracking()
 	
 def command_starting_handler(args:adsk.core.ApplicationCommandEventArgs):
 	global track_count_
@@ -135,10 +134,10 @@ def command_starting_handler(args:adsk.core.ApplicationCommandEventArgs):
 	if cmd_def == enable_cmd_def_: return # Skip ourselves
 	
 	if cmd_def not in cmd_def_history_:
-		while len(cmd_def_history_) >= HISTORY_LENGTH:
-			cmd_def_history_.popleft()
-			cmd_controls_.popleft().deleteMe()
+		while len(cmd_def_history_) >= HISTORY_LENGTH: cmd_controls_.popleft().deleteMe()
+		cmd_def_history_.clear()
 		
+
 		tryIcon(cmd_def, './resources/noicon')
 		cmd_control = tracking_dropdown_.controls.addCommand(cmd_def)
 		if cmd_control:
@@ -236,7 +235,6 @@ def look_at_sketch_handler(args: adsk.core.CommandCreatedEventArgs):
 		ui_.activeSelections.clear()
 		ui_.activeSelections.add(edit_object)
 		executeCommand('LookAtCommand')
-
 		# We must give the Look At command time to run. This seems to imitate the way that Fusion does it.
 		# Using lambda to get fresh/valid instance of activeSelections at the end of the wait.
 		on_command_terminate('LookAtCommand', adsk.core.CommandTerminationReason.CancelledTerminationReason, lambda: ui_.activeSelections.clear())
@@ -252,12 +250,10 @@ def look_at_sketch_or_selected_handler(args: adsk.core.CommandCreatedEventArgs):
 def activate_containing_component_handler(args: adsk.core.CommandCreatedEventArgs):
 	args.command.isRepeatable = False
 	if ui_.activeSelections.count == 1:
-		selected = ui_.activeSelections[0].entity
+		selected = ui_.activeSelections.item(0).entity
 		if not isinstance(selected, (adsk.fusion.Component, adsk.fusion.Occurrence)):
 			ui_.activeSelections.clear() # Component not selected. Select the component.
-			if selected.assemblyContext is None:
-				ui_.activeSelections.add(app_.activeProduct.rootComponent) # Root component
-			else: ui_.activeSelections.add(selected.assemblyContext)
+			ui_.activeSelections.add(selected.assemblyContext or app_.activeProduct.rootComponent)
 		executeCommand('FusionActivateLocalCompCmd')
 		executeCommand('FindInBrowser')
 
@@ -273,34 +269,43 @@ def repeat_command_handler(args: adsk.core.CommandCreatedEventArgs):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def getCameraDirection(camera:adsk.core.Camera):
-	eye = camera.eye
-	target = camera.target
-	return eye.vectorTo(target)
+	return camera.eye.vectorTo(camera.target)
+
+
+finiteGometry = (adsk.fusion.BRepEdge, adsk.fusion.SketchLine)
+infiniteGeometry = (adsk.fusion.ConstructionAxis,)
 
 def getLineDirection(line):
-	if isinstance(line, adsk.fusion.BRepEdge):
-		start = line.startVertex.geometry
-		end = line.endVertex.geometry
-		lineDirection = start.vectorTo(end)
-	elif isinstance(line, adsk.fusion.SketchLine):
-		start = line.startSketchPoint.geometry
-		end = line.endSketchPoint.geometry
-		lineDirection = start.vectorTo(end)
-	elif isinstance(line, adsk.fusion.ConstructionAxis):
-		infLine = line.geometry
-		lineDirection = infLine.direction
+	if isinstance(line, finiteGometry):
+		if isinstance(line, adsk.fusion.BRepEdge):
+			start = line.startVertex.geometry
+			end = line.endVertex.geometry
+			lineDirection = start.vectorTo(end)
+		elif isinstance(line, adsk.fusion.SketchLine):
+			start = line.startSketchPoint.geometry
+			end = line.endSketchPoint.geometry
+			lineDirection = start.vectorTo(end)
+	elif isinstance(line, infiniteGeometry):
+		if isinstance(line, adsk.fusion.ConstructionAxis):
+			infLine = line.geometry
+			lineDirection = infLine.direction
+	else: raise TypeError('Incorrect line Type.')
 	return lineDirection
 
-def projectVectors(fromVec:adsk.core.Vector3D,toVec:adsk.core.Vector3D):
+def projectVectors(fromVec:adsk.core.Vector3D,toVec:adsk.core.Vector3D, normalised=False):
 	dotProd = fromVec.dotProduct(toVec)
 	sqrMag = fromVec.length**2
 
 	projection = toVec.copy()
 	projection.scaleBy(dotProd/sqrMag)
-	return projection
+	if normalised: projection.normalize()
+	return projection 
 
-	# executeCommand('LookAtCommand')
-	# adsk.doEvents()
+def reAssignCamera(cameraCopy:adsk.core.Camera):
+	cameraCopy.isSmoothTransition = True
+	app_.activeViewport.camera = cameraCopy
+	ui_.activeSelections.clear()
+
 
 
 def alignViewHandler(args: adsk.core.CommandCreatedEventArgs):
@@ -310,25 +315,23 @@ def alignViewHandler(args: adsk.core.CommandCreatedEventArgs):
 	lineDirection = getLineDirection(upLine)
 	upDirection = app_.activeViewport.camera.upVector.copy()
 
-	orintatedVector = projectVectors(upDirection,lineDirection)
-	orintatedVector.normalize()
+	orintatedVector = projectVectors(upDirection,lineDirection,True)
 
 	camera_copy = app_.activeViewport.camera
 	camera_copy.upVector = orintatedVector
-	camera_copy.isSmoothTransition = True
-	app_.activeViewport.camera = camera_copy
-	ui_.activeSelections.clear()
-
+	reAssignCamera(camera_copy)
 
 def changeViewAxis(args: adsk.core.CommandCreatedEventArgs):
 	args.command.isRepeatable = False
 	args.command.isExecutedWhenPreEmpted = False
-	upLine = ui_.selectEntity('Please select a line represinting the "forwards" direction', 'LinearEdges,SketchLines,ConstructionLines').entity
-	lineDirection = getLineDirection(upLine)
+	forwardsLine = ui_.selectEntity('Please select a line represinting the "forwards" direction', 'LinearEdges,SketchLines,ConstructionLines').entity
+	lineDirection = getLineDirection(forwardsLine)
 	cameraDirection = getCameraDirection(app_.activeViewport.camera)
 
-	orintatedVector = projectVectors(cameraDirection,lineDirection)
-	orintatedVector.normalize()
+	orintatedVector = projectVectors(cameraDirection,lineDirection,True)
+	if orintatedVector.length != 1: #Prevents perpendicular angles from failing
+		orintatedVector = lineDirection.copy()
+		orintatedVector.normalize()
 	orintatedVector.scaleBy(cameraDirection.length)
 
 	newEye = app_.activeViewport.camera.target.asVector()
@@ -336,9 +339,7 @@ def changeViewAxis(args: adsk.core.CommandCreatedEventArgs):
 
 	camera_copy = app_.activeViewport.camera
 	camera_copy.eye = newEye.asPoint()
-	camera_copy.isSmoothTransition = True
-	app_.activeViewport.camera = camera_copy
-	ui_.activeSelections.clear()
+	reAssignCamera(camera_copy)
 
 
 
@@ -376,7 +377,7 @@ def createInputsHandler():
 						try:
 							control = toolbarPanel.controls.item(i)
 							if not isinstance(control, adsk.core.CommandControl):continue
-							if not control.isValid or not control.isVisible:continue
+							if not (control.isValid and control.isVisible):continue
 							createEntry(tableInput,tableInput.rowCount,control)
 						except:pass
 				except:pass
@@ -426,9 +427,8 @@ def createChain(*commandIds):
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	def commandStartingHandler(args:adsk.core.ApplicationCommandEventArgs):
 		nonlocal currentCommand
-		startingCommand = args.commandId
-		if startingCommand == chainId:return
-		if startingCommand != commandOrder[0]: return
+		if args.commandId == chainId:return
+		if args.commandId != commandOrder[0]: return
 		currentCommand = commandOrder.pop(0)
 
 	def commandTerminatedHandler(args:adsk.core.ApplicationCommandEventArgs):
@@ -441,11 +441,12 @@ def createChain(*commandIds):
 		nonlocal currentCommand,startingInfo,terminatedInfo
 		events_manager_.remove_handler(startingInfo)
 		events_manager_.remove_handler(terminatedInfo)
-		startingInfo=terminatedInfo= None
-		currentCommand = None
+		startingInfo=terminatedInfo=currentCommand= None
 	return initialCreate
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def failExecute(args: adsk.core.CommandEventArgs, message:str):
+	args.executeFailed,args.executeFailedMessage = True,message
 
 def create_roll_history_handler(move_function_name):
 	# Cannot use select + the native FusionRollCommand, due to this bug (2020-08-02):
@@ -454,9 +455,7 @@ def create_roll_history_handler(move_function_name):
 	def execute_handler(args: adsk.core.CommandEventArgs):
 		timeline_status, timeline = libTimeLine.get_timeline()
 		if timeline_status != libTimeLine.TIMELINE_STATUS_OK:
-			args.executeFailed = True
-			args.executeFailedMessage = 'Failed to get the timeline'
-			return
+			return failExecute(args,'Failed to get the timeline')
 		move_function = getattr(timeline, move_function_name)
 		move_function()
 
@@ -528,14 +527,14 @@ def add_builtin_dropdown(parent:adsk.core.ToolbarPanel):
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	create(builtin_dropdown_.controls,
 			'thomasa88_anyShortcutBuiltinAlignView',
-			'Align The Camera',
+			'Align The Cameras Up',
 			'',
 			'./resources/repeat',
 			alignViewHandler)
 
 	create(builtin_dropdown_.controls,
 			'thomasa88_anyShortcutBuiltinChangeView',
-			'Change the view axis',
+			'Change the view Forwards',
 			'',
 			'./resources/activate',
 			changeViewAxis)
